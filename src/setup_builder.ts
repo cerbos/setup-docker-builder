@@ -5,6 +5,7 @@ import { promisify } from "util";
 import * as TOML from "@iarna/toml";
 import * as reporter from "./reporter";
 import { execa } from "execa";
+import * as stateHelper from "./state-helper";
 
 // Constants for configuration.
 const BUILDKIT_DAEMON_ADDR = "tcp://127.0.0.1:1234";
@@ -233,6 +234,7 @@ export async function startAndConfigureBuildkitd(
 
   const addr = await startBuildkitd(parallelism, buildkitdAddr, buildkitdPath);
   core.debug(`buildkitd daemon started at addr ${addr}`);
+  stateHelper.setBuildkitdAddr(addr);
 
   // Check that buildkit instance is ready by querying workers for up to 30s
   const startTimeBuildkitReady = Date.now();
