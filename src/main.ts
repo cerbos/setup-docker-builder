@@ -161,7 +161,6 @@ async function startBlacksmithBuilder(
 
     // Save state for post action
     stateHelper.setExposeId(stickyDiskSetup.exposeId);
-    stateHelper.setBuildkitdAddr(buildkitdAddr);
 
     return { addr: buildkitdAddr, exposeId: stickyDiskSetup.exposeId };
   } catch (error) {
