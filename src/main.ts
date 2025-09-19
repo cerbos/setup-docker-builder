@@ -368,7 +368,7 @@ void actionsToolkit.run(
                 "buildkitd process has crashed - process not found but was expected to be running",
               );
 
-              // Print tail of blacksmithd logs to help debug the crash
+              // Print tail of buildkitd logs to help debug the crash
               try {
                 const { stdout: logOutput } = await execAsync(
                   "tail -n 100 /tmp/buildkitd.log 2>/dev/null || echo 'No buildkitd.log found'",
