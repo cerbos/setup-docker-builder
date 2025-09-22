@@ -388,7 +388,7 @@ void actionsToolkit.run(
     await core.group("Cleaning up Docker builder", async () => {
       const exposeId = stateHelper.getExposeId();
       let cleanupError: Error | null = null;
-      let integrityCheckPassed = false;
+      let integrityCheckPassed: boolean | null = null;
 
       try {
         // Step 1: Check if buildkitd is running and shut it down
@@ -558,6 +558,10 @@ void actionsToolkit.run(
             );
             core.warning(
               "Skipping sticky disk commit due to ambiguity in failure detection",
+            );
+          } else if (integrityCheckPassed === null) {
+            core.warning(
+              "Skipping sticky disk commit due to integrity check not being run",
             );
           } else if (!integrityCheckPassed) {
             core.warning(
