@@ -17,6 +17,7 @@ import {
   startAndConfigureBuildkitd,
   getNumCPUs,
   pruneBuildkitCache,
+  logDatabaseHashes,
 } from "./setup_builder";
 import {
   installBuildKit,
@@ -524,6 +525,10 @@ void actionsToolkit.run(
             `mount | grep ${mountPoint}`,
           );
           integrityCheckPassed = await checkBoltDbIntegrity();
+
+          // Log database file hashes after integrity check
+          await logDatabaseHashes("after integrity check");
+
           if (mountOutput) {
             for (let attempt = 1; attempt <= 3; attempt++) {
               try {
@@ -626,6 +631,7 @@ void actionsToolkit.run(
               core.info(
                 "No previous step failures detected, committing sticky disk after successful cleanup",
               );
+
               await reporter.commitStickyDisk(exposeId);
             } catch (error) {
               core.error(

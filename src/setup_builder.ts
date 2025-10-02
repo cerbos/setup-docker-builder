@@ -304,6 +304,41 @@ export async function pruneBuildkitCache(): Promise<void> {
   }
 }
 
+/**
+ * Logs MD5 hashes of specific buildkit database files
+ * Uses md5sum with a 5-second timeout to avoid blocking on large files
+ */
+export async function logDatabaseHashes(label: string): Promise<void> {
+  const dbFiles = [
+    "/var/lib/buildkit/history.db",
+    "/var/lib/buildkit/cache.db",
+  ];
+
+  core.info(`Database file hashes (${label}):`);
+
+  for (const filePath of dbFiles) {
+    try {
+      // Use timeout and md5sum to offload computation, avoiding reading file in Node.js
+      const { stdout } = await execAsync(
+        `timeout 5s md5sum "${filePath}" 2>/dev/null || echo "timeout"`,
+      );
+      const output = stdout.trim();
+
+      if (output === "timeout") {
+        core.warning(`  ${filePath}: hash computation timed out after 5s`);
+      } else if (output) {
+        // md5sum output format: "hash  filename"
+        const hash = output.split(/\s+/)[0];
+        core.info(`  ${filePath}: ${hash}`);
+      } else {
+        core.info(`  ${filePath}: not found`);
+      }
+    } catch {
+      core.info(`  ${filePath}: not found`);
+    }
+  }
+}
+
 // stickyDiskTimeoutMs states the max amount of time this action will wait for the VM agent to
 // expose the sticky disk from the storage agent, map it onto the host and then patch the drive
 // into the VM.
@@ -336,6 +371,9 @@ export async function setupStickyDisk(): Promise<{
     await execAsync(`sudo mount ${device} ${mountPoint}`);
     core.debug(`${device} has been mounted to ${mountPoint}`);
     core.info("Successfully obtained sticky disk");
+
+    // Log database file hashes after mount
+    await logDatabaseHashes("after mount");
 
     return { device, exposeId };
   } catch (error) {
