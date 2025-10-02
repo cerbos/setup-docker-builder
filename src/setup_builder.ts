@@ -6,7 +6,6 @@ import * as TOML from "@iarna/toml";
 import * as reporter from "./reporter";
 import { execa } from "execa";
 import * as stateHelper from "./state-helper";
-import * as crypto from "crypto";
 
 // Constants for configuration.
 const BUILDKIT_DAEMON_ADDR = "tcp://127.0.0.1:1234";
@@ -306,15 +305,8 @@ export async function pruneBuildkitCache(): Promise<void> {
 }
 
 /**
- * Computes a hash for a file by reading its contents
- */
-async function hashFile(filePath: string): Promise<string> {
-  const content = await fs.promises.readFile(filePath);
-  return crypto.createHash("sha256").update(content).digest("hex");
-}
-
-/**
- * Logs SHA256 hashes of specific buildkit database files
+ * Logs MD5 hashes of specific buildkit database files
+ * Uses md5sum with a 5-second timeout to avoid blocking on large files
  */
 export async function logDatabaseHashes(label: string): Promise<void> {
   const dbFiles = [
@@ -326,10 +318,20 @@ export async function logDatabaseHashes(label: string): Promise<void> {
 
   for (const filePath of dbFiles) {
     try {
-      const stats = await fs.promises.stat(filePath);
-      if (stats.isFile()) {
-        const hash = await hashFile(filePath);
+      // Use timeout and md5sum to offload computation, avoiding reading file in Node.js
+      const { stdout } = await execAsync(
+        `timeout 5s md5sum "${filePath}" 2>/dev/null || echo "timeout"`,
+      );
+      const output = stdout.trim();
+
+      if (output === "timeout") {
+        core.warning(`  ${filePath}: hash computation timed out after 5s`);
+      } else if (output) {
+        // md5sum output format: "hash  filename"
+        const hash = output.split(/\s+/)[0];
         core.info(`  ${filePath}: ${hash}`);
+      } else {
+        core.info(`  ${filePath}: not found`);
       }
     } catch {
       core.info(`  ${filePath}: not found`);
