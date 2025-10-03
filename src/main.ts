@@ -632,7 +632,31 @@ void actionsToolkit.run(
                 "No previous step failures detected, committing sticky disk after successful cleanup",
               );
 
-              await reporter.commitStickyDisk(exposeId);
+              // Get filesystem usage of /var/lib/buildkit mount point
+              let fsDiskUsageBytes: number | null = null;
+              try {
+                const { stdout } = await execAsync(
+                  "df -B1 --output=used /var/lib/buildkit | tail -n1",
+                );
+                const parsedValue = parseInt(stdout.trim(), 10);
+
+                if (isNaN(parsedValue) || parsedValue <= 0) {
+                  core.warning(
+                    `Invalid filesystem usage value from df: "${stdout.trim()}". Will not report fs usage.`,
+                  );
+                } else {
+                  fsDiskUsageBytes = parsedValue;
+                  core.info(
+                    `Filesystem usage: ${fsDiskUsageBytes} bytes (${(fsDiskUsageBytes / (1 << 30)).toFixed(2)} GB)`,
+                  );
+                }
+              } catch (error) {
+                core.warning(
+                  `Failed to get filesystem usage: ${(error as Error).message}. Will not report fs usage.`,
+                );
+              }
+
+              await reporter.commitStickyDisk(exposeId, fsDiskUsageBytes);
             } catch (error) {
               core.error(
                 `Failed to commit sticky disk: ${(error as Error).message}`,

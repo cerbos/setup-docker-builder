@@ -110,18 +110,34 @@ export async function reportMetric(
   }
 }
 
-export async function commitStickyDisk(exposeId: string): Promise<void> {
+export async function commitStickyDisk(
+  exposeId: string,
+  fsDiskUsageBytes: number | null,
+): Promise<void> {
   try {
     const agentClient = createBlacksmithAgentClient();
 
-    await agentClient.commitStickyDisk({
+    const commitRequest: Record<string, unknown> = {
       exposeId: exposeId,
       stickyDiskKey: process.env.GITHUB_REPO_NAME || "",
       vmId: process.env.BLACKSMITH_VM_ID || "",
       shouldCommit: true,
       repoName: process.env.GITHUB_REPO_NAME || "",
       stickyDiskToken: process.env.BLACKSMITH_STICKYDISK_TOKEN || "",
-    });
+    };
+
+    // Only include fsDiskUsageBytes if we have valid data (> 0)
+    // This allows storage agent to fall back to previous sizing logic when data is unavailable
+    if (fsDiskUsageBytes !== null && fsDiskUsageBytes > 0) {
+      commitRequest.fsDiskUsageBytes = BigInt(fsDiskUsageBytes);
+      core.debug(`Reporting fs usage: ${fsDiskUsageBytes} bytes`);
+    } else {
+      core.debug(
+        "No fs usage data available, storage agent will use fallback sizing",
+      );
+    }
+
+    await agentClient.commitStickyDisk(commitRequest);
 
     core.info("Successfully committed sticky disk");
   } catch (error) {
