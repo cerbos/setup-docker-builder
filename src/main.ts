@@ -424,6 +424,7 @@ void actionsToolkit.run(
     await core.group("Cleaning up Docker builder", async () => {
       const exposeId = stateHelper.getExposeId();
       let cleanupError: Error | null = null;
+      let fsDiskUsageBytes: number | null = null;
       let integrityCheckPassed: boolean | null = null;
 
       try {
@@ -522,17 +523,42 @@ void actionsToolkit.run(
 
         try {
           const { stdout: mountOutput } = await execAsync(
-            `mount | grep ${mountPoint}`,
+            `mount | grep "${mountPoint}"`,
           );
           integrityCheckPassed = await checkBoltDbIntegrity();
 
           // Log database file hashes after integrity check
           await logDatabaseHashes("after integrity check");
 
+          // Get filesystem usage BEFORE unmounting (critical timing)
+          try {
+            const { stdout } = await execAsync(
+              "df -B1 --output=used /var/lib/buildkit | tail -n1",
+            );
+            const parsedValue = parseInt(stdout.trim(), 10);
+
+            if (isNaN(parsedValue) || parsedValue <= 0) {
+              core.warning(
+                `Invalid filesystem usage value from df: "${stdout.trim()}". Will not report fs usage.`,
+              );
+            } else {
+              fsDiskUsageBytes = parsedValue;
+              core.info(
+                `Filesystem usage: ${parsedValue} bytes (${(parsedValue / (1 << 30)).toFixed(2)} GiB)`,
+              );
+            }
+          } catch (error) {
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            core.warning(
+              `Failed to get filesystem usage: ${errorMsg}. Will not report fs usage.`,
+            );
+          }
+
           if (mountOutput) {
             for (let attempt = 1; attempt <= 3; attempt++) {
               try {
-                await execAsync(`sudo umount ${mountPoint}`);
+                await execAsync(`sudo umount "${mountPoint}"`);
                 core.info(`Successfully unmounted ${mountPoint}`);
                 break;
               } catch (error) {
@@ -631,30 +657,6 @@ void actionsToolkit.run(
               core.info(
                 "No previous step failures detected, committing sticky disk after successful cleanup",
               );
-
-              // Get filesystem usage of /var/lib/buildkit mount point
-              let fsDiskUsageBytes: number | null = null;
-              try {
-                const { stdout } = await execAsync(
-                  "df -B1 --output=used /var/lib/buildkit | tail -n1",
-                );
-                const parsedValue = parseInt(stdout.trim(), 10);
-
-                if (isNaN(parsedValue) || parsedValue <= 0) {
-                  core.warning(
-                    `Invalid filesystem usage value from df: "${stdout.trim()}". Will not report fs usage.`,
-                  );
-                } else {
-                  fsDiskUsageBytes = parsedValue;
-                  core.info(
-                    `Filesystem usage: ${fsDiskUsageBytes} bytes (${(fsDiskUsageBytes / (1 << 30)).toFixed(2)} GB)`,
-                  );
-                }
-              } catch (error) {
-                core.warning(
-                  `Failed to get filesystem usage: ${(error as Error).message}. Will not report fs usage.`,
-                );
-              }
 
               await reporter.commitStickyDisk(exposeId, fsDiskUsageBytes);
             } catch (error) {
