@@ -219,6 +219,7 @@ export async function getStickyDisk(options?: {
       signal: options?.signal,
     },
   );
+  core.info(`Full getStickyDisk response: ${JSON.stringify(response)}`);
   return {
     expose_id: (response as { exposeId?: string }).exposeId || "",
     device: (response as { diskIdentifier?: string }).diskIdentifier || "",
