@@ -411,6 +411,22 @@ export async function setupStickyDisk(): Promise<{
       core.warning(`Failed to get filesystem free space: ${errorMsg}`);
     }
 
+    // Check for lost+found directory which indicates filesystem issues during shutdown
+    try {
+      const { stdout } = await execAsync(
+        `test -d ${mountPoint}/lost+found && echo "exists" || echo "not found"`,
+      );
+      if (stdout.trim() === "exists") {
+        core.warning(
+          `Found lost+found directory in ${mountPoint} - this typically indicates there was an issue during previous shutdown`,
+        );
+      }
+    } catch (error) {
+      core.debug(
+        `Error checking for lost+found directory: ${(error as Error).message}`,
+      );
+    }
+
     // Log database file hashes after mount
     await logDatabaseHashes("after mount");
 
