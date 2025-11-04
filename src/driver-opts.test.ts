@@ -56,7 +56,8 @@ describe("driver-opts parsing", () => {
     expect(mockExeca).toHaveBeenCalledTimes(1);
     const commandCall = mockExeca.mock.calls[0][0] as string;
 
-    // Check that environment variables are included in the command
+    // Check that environment variables are included in the command with sudo env
+    expect(commandCall).toContain("sudo env");
     expect(commandCall).toContain("OTEL_TRACES_EXPORTER='otlp'");
     expect(commandCall).toContain(
       "OTEL_EXPORTER_OTLP_PROTOCOL='http/protobuf'",
@@ -65,7 +66,6 @@ describe("driver-opts parsing", () => {
       "OTEL_EXPORTER_OTLP_ENDPOINT='https://example.com'",
     );
     expect(commandCall).toContain("OTEL_SERVICE_NAME='buildkitd'");
-    expect(commandCall).toContain("sudo -E");
   });
 
   it("should warn about invalid driver-opt format", async () => {
@@ -120,9 +120,10 @@ describe("driver-opts parsing", () => {
     expect(mockExeca).toHaveBeenCalledTimes(1);
     const commandCall = mockExeca.mock.calls[0][0] as string;
 
-    // Should not contain any environment variables
+    // Should not contain any environment variables, no env command
     expect(commandCall).not.toContain("OTEL_");
-    expect(commandCall).toContain("sudo -E");
+    expect(commandCall).not.toContain("sudo env");
+    expect(commandCall).toContain("nohup sudo");
   });
 
   it("should handle undefined driver-opts", async () => {
@@ -143,9 +144,10 @@ describe("driver-opts parsing", () => {
     expect(mockExeca).toHaveBeenCalledTimes(1);
     const commandCall = mockExeca.mock.calls[0][0] as string;
 
-    // Should not contain any environment variables
+    // Should not contain any environment variables, no env command
     expect(commandCall).not.toContain("OTEL_");
-    expect(commandCall).toContain("sudo -E");
+    expect(commandCall).not.toContain("sudo env");
+    expect(commandCall).toContain("nohup sudo");
   });
 
   it("should handle driver-opts with special characters in values", async () => {

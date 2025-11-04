@@ -162,13 +162,17 @@ export async function startBuildkitd(
     // Use custom buildkitd path if provided, otherwise use system buildkitd
     const buildkitdBinary = buildkitdPath || "buildkitd";
 
-    // Build the command with environment variables
-    let buildkitdCommand = "nohup";
-    // Add environment variables to the command
-    for (const [key, value] of Object.entries(envVars)) {
-      buildkitdCommand += ` ${key}='${value}'`;
+    // Build the command with environment variables passed through sudo
+    let buildkitdCommand = "nohup sudo";
+    // Add environment variables after sudo using env command
+    if (Object.keys(envVars).length > 0) {
+      buildkitdCommand += " env";
+      for (const [key, value] of Object.entries(envVars)) {
+        // Use env command to set environment variables after sudo
+        buildkitdCommand += ` ${key}='${value}'`;
+      }
     }
-    buildkitdCommand += ` sudo -E ${buildkitdBinary} --debug --config=buildkitd.toml --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host > /tmp/buildkitd.log 2>&1 &`;
+    buildkitdCommand += ` ${buildkitdBinary} --debug --config=buildkitd.toml --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host > /tmp/buildkitd.log 2>&1 &`;
 
     core.info(`Starting buildkitd with command: ${buildkitdCommand}`);
     const buildkitd = execa(buildkitdCommand, {
