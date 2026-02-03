@@ -32,6 +32,80 @@ const DEFAULT_BUILDX_VERSION = "v0.23.0";
 const mountPoint = "/var/lib/buildkit";
 const execAsync = promisify(exec);
 
+async function getDeviceFromMount(mountPath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync(`findmnt -n -o SOURCE "${mountPath}"`);
+    const device = stdout.trim();
+    if (device) {
+      return device;
+    }
+  } catch {
+    core.debug(`findmnt failed for ${mountPath}, trying mount command`);
+  }
+
+  try {
+    const { stdout } = await execAsync(`mount | grep " ${mountPath} "`);
+    const match = stdout.match(/^(\/dev\/\S+)/);
+    if (match) {
+      return match[1];
+    }
+  } catch {
+    core.debug(`mount grep failed for ${mountPath}`);
+  }
+
+  return null;
+}
+
+async function flushBlockDevice(devicePath: string): Promise<void> {
+  const enableFlush = process.env.ENABLE_DURABILITY_FLUSH !== "false";
+  if (!enableFlush) {
+    core.debug("Durability flush disabled via ENABLE_DURABILITY_FLUSH=false");
+    return;
+  }
+
+  const deviceName = devicePath.replace("/dev/", "");
+  if (!deviceName) {
+    core.warning(`Could not extract device name from ${devicePath}`);
+    return;
+  }
+
+  const statPath = `/sys/block/${deviceName}/stat`;
+
+  let beforeStats = "";
+  try {
+    const { stdout } = await execAsync(`cat ${statPath}`);
+    beforeStats = stdout.trim();
+  } catch {
+    core.debug(`Could not read block device stats before flush: ${statPath}`);
+  }
+
+  const startTime = Date.now();
+  try {
+    await execAsync(`sudo blockdev --flushbufs ${devicePath}`, {
+      timeout: 30000,
+    });
+    const duration = Date.now() - startTime;
+
+    let afterStats = "";
+    try {
+      const { stdout } = await execAsync(`cat ${statPath}`);
+      afterStats = stdout.trim();
+    } catch {
+      core.debug(`Could not read block device stats after flush: ${statPath}`);
+    }
+
+    core.info(
+      `guest flush duration: ${duration}ms, device: ${devicePath}, before_stats: ${beforeStats}, after_stats: ${afterStats}`,
+    );
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    core.warning(
+      `guest flush failed for ${devicePath} after ${duration}ms: ${errorMsg}`,
+    );
+  }
+}
+
 async function checkBoltDbIntegrity(skip = false): Promise<boolean> {
   if (skip) {
     core.info(
@@ -604,6 +678,19 @@ void actionsToolkit.run(
         // Step 2: Sync and unmount sticky disk
         await execAsync("sync");
 
+        // BLA-3202: Get device path before unmount for durability flush
+        let devicePath: string | null = null;
+        try {
+          devicePath = await getDeviceFromMount(mountPoint);
+          if (devicePath) {
+            core.debug(
+              `Found device ${devicePath} for mount point ${mountPoint}`,
+            );
+          }
+        } catch {
+          core.debug(`Could not determine device for ${mountPoint}`);
+        }
+
         try {
           const { stdout: mountOutput } = await execAsync(
             `mount | grep "${mountPoint}"`,
@@ -665,6 +752,16 @@ void actionsToolkit.run(
                 core.warning(`Unmount failed, retrying (${attempt}/3)...`);
                 await new Promise((resolve) => setTimeout(resolve, 100));
               }
+            }
+
+            // BLA-3202: Flush block device buffers after unmount to ensure data durability
+            // before the Ceph RBD snapshot is taken. The device is still mapped even though unmounted.
+            if (devicePath) {
+              await flushBlockDevice(devicePath);
+            } else {
+              core.debug(
+                "Skipping durability flush: device path not found for mount point",
+              );
             }
           } else {
             core.debug("No sticky disk mount found");
