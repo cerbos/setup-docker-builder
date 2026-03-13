@@ -144523,7 +144523,7 @@ require("./sourcemap-register.js");
     }
     async function reportBuildPushActionFailure(a, d, T) {
       const k = {
-        stickydisk_key: process.env.GITHUB_REPO_NAME || "",
+        stickydisk_key: process.env.STICKY_DISK_KEY || process.env.GITHUB_REPO_NAME || "",
         repo_name: process.env.GITHUB_REPO_NAME || "",
         region: process.env.BLACKSMITH_REGION || "eu-central",
         arch: process.env.BLACKSMITH_ENV?.includes("arm") ? "arm64" : "amd64",
@@ -144585,7 +144585,7 @@ require("./sourcemap-register.js");
         const T = createBlacksmithAgentClient();
         const k = {
           exposeId: a,
-          stickyDiskKey: process.env.GITHUB_REPO_NAME || "",
+          stickyDiskKey: process.env.STICKY_DISK_KEY || process.env.GITHUB_REPO_NAME || "",
           vmId: process.env.BLACKSMITH_VM_ID || "",
           shouldCommit: true,
           repoName: process.env.GITHUB_REPO_NAME || "",
@@ -152474,7 +152474,7 @@ require("./sourcemap-register.js");
       } catch (a) {
         throw new Error(`grpc connection test failed: ${a.message}`);
       }
-      const T = process.env.GITHUB_REPO_NAME || "";
+      const T = process.env.STICKY_DISK_KEY || process.env.GITHUB_REPO_NAME || "";
       if (T === "") {
         throw new Error("GITHUB_REPO_NAME is not set");
       }
