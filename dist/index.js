@@ -153466,6 +153466,7 @@ require("./sourcemap-register.js");
             });
             const q = await d.buildx.getCommand(["use", T]);
             _.info("Setting builder as default");
+            _.exportVariable("BUILDX_BUILDER", T);
             await F.Exec.getExecOutput(q.command, q.args, {
               ignoreReturnCode: true,
             }).then((a) => {
