@@ -130737,6 +130737,12 @@ require("./sourcemap-register.js");
     const ne = process.env.STATE_inputs
       ? JSON.parse(process.env.STATE_inputs)
       : undefined;
+    function getStickyDiskKey() {
+      return _.getState("stickyDiskKey");
+    }
+    function setStickyDiskKey(key) {
+      _.saveState("stickyDiskKey", key);
+    }
     function setTmpDir(a) {
       _.saveState("tmpDir", a);
     }
@@ -144610,7 +144616,7 @@ require("./sourcemap-register.js");
         const T = createBlacksmithAgentClient();
         const k = {
           exposeId: a,
-          stickyDiskKey: process.env.STICKY_DISK_KEY || process.env.GITHUB_REPO_NAME || "",
+          stickyDiskKey: getStickyDiskKey(),
           vmId: process.env.BLACKSMITH_VM_ID || "",
           shouldCommit: true,
           repoName: process.env.GITHUB_REPO_NAME || "",
@@ -152503,6 +152509,7 @@ require("./sourcemap-register.js");
       if (T === "") {
         throw new Error("GITHUB_REPO_NAME is not set");
       }
+      setStickyDiskKey(T);
       _.info(`Getting sticky disk for ${T}`);
       const k = await d.getStickyDisk(
         {
