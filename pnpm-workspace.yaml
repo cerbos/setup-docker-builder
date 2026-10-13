@@ -1,6 +1,10 @@
 packages:
   - .
 
-onlyBuiltDependencies:
-  - esbuild
-  - lefthook
+allowBuilds:
+  "@bufbuild/buf": false
+  esbuild: false
+  lefthook: false
+
+overrides:
+  "@buf/blacksmith_vm-agent.bufbuild_es": file:.blacksmith_vm-agent.bufbuild_es

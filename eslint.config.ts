@@ -3,7 +3,7 @@ import { globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  globalIgnores(["dist", "src/gen"]),
+  globalIgnores([".blacksmith_vm-agent.bufbuild_es", "dist", "src/gen"]),
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
