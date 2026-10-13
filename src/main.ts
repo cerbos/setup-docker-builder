@@ -648,6 +648,7 @@ void actionsToolkit.run(
         // Set as default builder
         const useCmd = await toolkit.buildx.getCommand(["use", name]);
         core.info("Setting builder as default");
+        core.exportVariable("BUILDX_BUILDER", name);
         await Exec.getExecOutput(useCmd.command, useCmd.args, {
           ignoreReturnCode: true,
         }).then((res) => {
